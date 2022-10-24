@@ -3,7 +3,6 @@ pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-
 import "./BondingCurve.sol";
 
 contract ContinuousToken is BancorBondingCurve, Ownable, ERC20 {
@@ -19,7 +18,6 @@ contract ContinuousToken is BancorBondingCurve, Ownable, ERC20 {
         uint256 _reserveRatio
     ) ERC20("Dac","DAC") {
         reserveRatio = _reserveRatio;
-        _mint(msg.sender, 1*scale);
     }
 
     function mint() public payable {
