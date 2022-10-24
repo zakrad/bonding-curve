@@ -8,7 +8,7 @@ const mnemonic = fs.readFileSync(".secret").toString().trim();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.17",
+  solidity: "0.5.0",
   settings: { optimizer: { enabled: true, runs: 200 } },
   networks: {
     matic: {
@@ -26,3 +26,5 @@ module.exports = {
     apiKey: process.env.POLYGONSCAN_API_KEY,
   },
 };
+
+// node 0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9

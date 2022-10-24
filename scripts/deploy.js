@@ -2,14 +2,14 @@
 const hre = require("hardhat");
 
 async function main() {
-  
-  const Lock = await hre.ethers.getContractFactory("ContinuousToken");
-  const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
 
-  await lock.deployed();
+  const Token = await hre.ethers.getContractFactory("ContinuousToken");
+  const token = await Token.deploy(1000000);
+
+  await token.deployed();
 
   console.log(
-    `Lock with 1 ETH and unlock timestamp ${unlockTime} deployed to ${lock.address}`
+    `deployed to ${token.address}`
   );
 }
 

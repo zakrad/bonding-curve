@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.5.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./BondingCurve.sol";
 
-contract ContinuousToken is BancorBondingCurve, Ownable, ERC20 {
+contract ContinuousToken is BancorBondingCurve, Ownable, ERC20, ERC20Detailed {
 
     uint256 public scale = 10**18;
     uint256 public reserveBalance = 10*scale;
-    uint256 public reserveRatio;
+    uint32 public reserveRatio = 100000;
 
-    event ContinuousMint(address indexed _from, uint256 indexed, uint256 );
-    event ContinuousBurn(address indexed _from, uint256 indexed, uint256 );
+    event ContinuousMint(address indexed sender, uint256 indexed amount, uint256 deposit );
+    event ContinuousBurn(address indexed sender, uint256 indexed amount, uint256 reimbursement);
     
-    constructor(
-        uint256 _reserveRatio
-    ) ERC20("Dac","DAC") {
-        reserveRatio = _reserveRatio;
+    constructor(uint256 initialSupply) ERC20Detailed("Dac", "DAC", 18) public {
+        _mint(msg.sender, initialSupply);
     }
 
     function mint() public payable {
@@ -27,19 +26,19 @@ contract ContinuousToken is BancorBondingCurve, Ownable, ERC20 {
 
     function burn(uint256 _amount) public {
         uint256 returnAmount = _continuousBurn(_amount);
-        payable(msg.sender).transfer(returnAmount);
+        msg.sender.transfer(returnAmount);
     }
 
     function calculateContinuousMintReturn(uint256 _amount)
         public view returns (uint256 mintAmount)
     {
-        return calculatePurchaseReturn(totalSupply(), reserveBalance, uint32(reserveRatio), _amount);
+        return calculatePurchaseReturn(totalSupply(), reserveBalance,reserveRatio, _amount);
     }
 
     function calculateContinuousBurnReturn(uint256 _amount)
         public view returns (uint256 burnAmount)
     {
-        return calculateSaleReturn(totalSupply(), reserveBalance, uint32(reserveRatio), _amount);
+        return calculateSaleReturn(totalSupply(), reserveBalance,reserveRatio, _amount);
     }
 
     function _continuousMint(uint256 _deposit)

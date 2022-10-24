@@ -3462,6 +3462,11 @@
   dependencies:
     "wrappy" "1"
 
+"openzeppelin-solidity@^2.5.0":
+  "integrity" "sha512-I0yRC3nff9Kn2LDWuz02fuw0EuomVQ9Z8lHzdqh8P9BiOUzIk8frQRxn/a1Kva3StF6hwPP+Dh3/SQ2ily1Pow=="
+  "resolved" "https://registry.npmjs.org/openzeppelin-solidity/-/openzeppelin-solidity-2.5.0.tgz"
+  "version" "2.5.0"
+
 "optionator@^0.8.1":
   "integrity" "sha512-+IW9pACdk3XWmmTXG8m3upGUJst5XRGzxMRjXzAuJ1XnIFNvfhjjIuYkDvysnPQ7qzqVzLt78BCruntqRhWQbA=="
   "resolved" "https://registry.npmjs.org/optionator/-/optionator-0.8.3.tgz"
