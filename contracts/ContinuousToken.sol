@@ -15,7 +15,6 @@ contract ContinuousToken is BancorBondingCurve, Ownable, ERC20 {
     event ContinuousMint(address indexed _from, uint256 indexed, uint256 );
     event ContinuousBurn(address indexed _from, uint256 indexed, uint256 );
     
-
     constructor(
         uint256 _reserveRatio
     ) ERC20("Dac","DAC") {
@@ -48,8 +47,6 @@ contract ContinuousToken is BancorBondingCurve, Ownable, ERC20 {
     function _continuousMint(uint256 _deposit)
         internal returns (uint256)
     {
-        require(_deposit > 0, "Deposit must be non-zero.");
-
         uint256 amount = calculateContinuousMintReturn(_deposit);
         _mint(msg.sender, amount);
         reserveBalance = reserveBalance + _deposit;
