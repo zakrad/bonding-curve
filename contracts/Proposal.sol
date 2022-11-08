@@ -4,25 +4,32 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
-contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply {
+
+contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
+
+    address constant GAURD = address(1);
+    uint S;
+    uint holders; 
+    uint public A;
+    uint public B;
 
     mapping (address => uint) public balances;
     mapping (address => address) _nextHolders;
-    uint S;
-    uint holders;
-    // uint[] balances;
-    address constant GAURD = address(1);
-    
-    uint public A=25;
-    uint public B=3;
+
 
     constructor() ERC1155("") {
-        _nextHolders[GAURD] = GAURD;
+        _disableInitializers();
     }
-
+    
+    function initialize(string memory _uri, address _main, address _admin) public initializer {
+        _transferOwnership(_admin);
+        _nextHolders[GAURD] = GAURD;
+        A=25;
+        B=3;
+    }
 
     modifier onlyCaller(address _sender, uint _supplyId) {
       require(uint(keccak256(abi.encodePacked(_sender))) == _supplyId, "Your id does not match");
@@ -67,7 +74,7 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
         } else {
         reduceBalance(msg.sender, _dS);
         }
-        burn(msg.sender, supplyId, _dS);
+        _burn(msg.sender, supplyId, _dS);
         payable(msg.sender).transfer(sellPrice(_dS));      
         S -= _dS;
         return(S);
@@ -120,11 +127,20 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
     }
     }
 
-   function getTop(uint256 k) public view returns(address[] memory) {
-    require(k <= holders);
-    address[] memory holderList = new address[](k);
+    function transferToNext() external onlyOwner {
+    // address[] memory holderList = new address[](holders);
     address currentAddress = _nextHolders[GAURD];
-    for(uint256 i = 0; i < k; i++) {
+    for(uint256 i = 0; i < holders; i++) {
+      uint balanceOfCurrent = balanceOf(currentAddress, uint(keccak256(abi.encodePacked(currentAddress))));
+      payable(currentAddress).transfer(sellPrice(balanceOfCurrent)); 
+      currentAddress = _nextHolders[currentAddress];
+    }
+    }
+
+   function getArray() public view returns(address[] memory) {
+    address[] memory holderList = new address[](holders);
+    address currentAddress = _nextHolders[GAURD];
+    for(uint256 i = 0; i < holders; i++) {
       holderList[i] = currentAddress;
       currentAddress = _nextHolders[currentAddress];
     }
@@ -193,6 +209,4 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
     {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
-
-    receive() external payable {}
 }
