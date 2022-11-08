@@ -68,7 +68,7 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
         reduceBalance(msg.sender, _dS);
         }
         burn(msg.sender, supplyId, _dS);        
-        S += _dS;
+        S -= _dS;
         return(S);
     }
 
