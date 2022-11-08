@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "./IProposal.sol";
 
 
 contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
@@ -15,6 +16,8 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     uint holders; 
     uint public A;
     uint public B;
+    IProposal public nextProposal;
+
 
     mapping (address => uint) public balances;
     mapping (address => address) _nextHolders;
@@ -60,6 +63,21 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
         mint(msg.sender, supplyId, _dS, "");
 
         S += _dS;
+        return(S);
+    }
+
+    function importToNext(uint _dF, address _buyer) external payable returns(uint) {
+        require(_dF == msg.value, "Wrong value, Send the exact price");
+        uint supplyId = uint(keccak256(abi.encodePacked(_buyer))); 
+        
+        // if(balanceOf(_buyer,supplyId) == 0){
+        // addHolder(_buyer, _dS);
+        // } else {
+        // increaseBalance(msg.sender, _dS);
+        // }
+        // mint(msg.sender, supplyId, _dS, "");
+
+        // S += _dS;
         return(S);
     }
 
@@ -127,12 +145,12 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     }
     }
 
-    function transferToNext() external onlyOwner {
-    // address[] memory holderList = new address[](holders);
+    function transferToNext(address _nextProposal) external onlyOwner {
+    nextProposal =  IProposal(_nextProposal);
     address currentAddress = _nextHolders[GAURD];
     for(uint256 i = 0; i < holders; i++) {
       uint balanceOfCurrent = balanceOf(currentAddress, uint(keccak256(abi.encodePacked(currentAddress))));
-      payable(currentAddress).transfer(sellPrice(balanceOfCurrent)); 
+      nextProposal.importToNext{gas: 1000000, value: sellPrice(balanceOfCurrent)}(sellPrice(balanceOfCurrent), currentAddress);
       currentAddress = _nextHolders[currentAddress];
     }
     }
