@@ -57,7 +57,7 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
     }
 
     function Sell(uint _dS) public returns(uint) {
-        require(balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))) > 0, "You don't have any token to sell.")
+        require(balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))) > 0, "You don't have any token to sell.");
         require(_dS <= balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))), "You don't have this amount of token");
 
         uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
