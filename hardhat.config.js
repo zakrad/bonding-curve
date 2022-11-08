@@ -8,7 +8,7 @@ const mnemonic = fs.readFileSync(".secret").toString().trim();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.5.0",
+  solidity: "0.8.4",
   settings: { optimizer: { enabled: true, runs: 200 } },
   networks: {
     matic: {
