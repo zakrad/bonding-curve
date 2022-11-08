@@ -13,7 +13,56 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
 
     mapping (uint => address) public priority;
     uint totalSupply;
-    keccak256(msg.sender);
+    
+    uint public A=25;
+    uint public B=3;
+
+    modifier onlyCaller(address _sender, uint _supplyId) {
+      require(uint(keccak256(abi.encodePacked(_sender))) == _supplyId, "Your id does not match");
+      _;
+    }
+
+    modifier checkPrice(uint _dF) {
+        require(_dF == msg.value, "Send the exact price");
+        _;
+    }
+
+    function buyPrice(uint _dS) internal returns(uint) {
+        uint dF = (A*_dS) + (B/3) * ( (S + _dS)**3 - S**3 );
+        return dF;
+    }
+
+    function Buy(uint _dS) public payable returns(uint) {
+        uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
+        
+        uint S = totalSupply;
+        uint dF = (A*_dS) + (B/3) * ( (S + _dS)**3 - S**3 );
+
+        if(balanceOf(msg.sender,supplyId) == 0){
+
+        _mint(msg.sender, supplyId, _dS, "");
+
+        } else if {
+        
+        mint(msg.sender, supplyId, _dS, "")
+
+        }
+
+
+        if(Wsender>=dF){
+            W[msg.sender]-=dF;
+            payable(msg.sender).transfer(msg.value);
+        } else {
+            uint ExessB = Wsender + msg.value - dF;
+            require(ExessB >= 0 , "Insufficient funds!");
+            payable(msg.sender).transfer(ExessB);
+            W[msg.sender]=0;
+            V[msg.sender]+=dF-Wsender;
+        }
+        totalSupply += _dS;
+        return(dF);
+    }
+
 
     function pause() public onlyOwner {
         _pause();
@@ -24,8 +73,8 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
     }
 
     function mint(address account, uint256 id, uint256 amount, bytes memory data)
-        public
-        onlyOwner
+        internal
+        onlyCaller(account, id)
     {
         _mint(account, id, amount, data);
     }
