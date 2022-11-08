@@ -56,9 +56,9 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
         return(S);
     }
 
-    function Sell(uint _dS) public payable returns(uint) {
-        require(sellPrice(_dS) == msg.value, "Wrong value, Send the exact price");
-        require(_dS <= balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))));
+    function Sell(uint _dS) public returns(uint) {
+        require(balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))) > 0, "You don't have any token to sell.")
+        require(_dS <= balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))), "You don't have this amount of token");
 
         uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
 
@@ -67,7 +67,8 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
         } else {
         reduceBalance(msg.sender, _dS);
         }
-        burn(msg.sender, supplyId, _dS);        
+        burn(msg.sender, supplyId, _dS);
+        payable(msg.sender).transfer(sellPrice(_dS));      
         S -= _dS;
         return(S);
     }
@@ -137,6 +138,7 @@ contract Proposal is ERC1155, Pausable, Ownable, ERC1155Burnable, ERC1155Supply 
         return candidateAddress;
       candidateAddress = _nextHolders[candidateAddress];
     }
+    return address(0);
   }
 
 
