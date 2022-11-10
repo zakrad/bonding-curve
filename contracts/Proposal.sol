@@ -46,7 +46,7 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable {
 
     function sellPrice(uint _dS) public view returns(uint) {
         // uint dF = (A*_dS) + (B/3)*( S**3 - (S - _dS)**3 );
-        uint dF = 1000 * (sqrt(S**2+10**6)-sqrt((S+_dS)**2+10**6));
+        uint dF = 1000 * (sqrt(S**2+10**6)-sqrt((S-_dS)**2+10**6));
         return dF;
     }
 
