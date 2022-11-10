@@ -5,17 +5,17 @@ import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "./IMain.sol";
+import "./IProposal.sol";
 
 
-contract Proposal is Initializable, ERC1155, Pausable, Ownable {
+contract Main is Initializable, ERC1155, Pausable, Ownable {
 
     address constant GAURD = address(1);
     uint S;
     uint holders; 
     uint public A;
     uint public B;
-    IMain public nextMain;
+    IProposal public nextProposal;
 
 
     mapping (address => uint) public balances;
@@ -67,7 +67,7 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable {
         return(S);
     }
 
-    function importFromMain(address _buyer) external payable returns(uint) {
+    function importFromProposal(address _buyer) external payable returns(uint) {
       // require(isProposal(msg.sender), "Only callable from another proposal");
         uint supplyId = uint(keccak256(abi.encodePacked(_buyer))); 
         uint dS = (sqrt(((10**6)*(S**2))+((msg.value)**2)+(2000*msg.value*sqrt(S**2+10**6)))-(1000*S))/1000;
@@ -145,15 +145,17 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable {
     }
     }
 
-    function transferToMain(address _main) external onlyOwner whenPaused() {
-    nextMain =  IMain(_main);
+    function transferToProposals(address[] memory _proposals) external onlyOwner whenPaused() {
     address currentAddress = _nextHolders[GAURD];
-    for(uint256 i = 0; i < holders; i++) {
+    for(uint256 i = 0; i < holders ; i++) {
       uint currentId = uint(keccak256(abi.encodePacked(currentAddress)));
       uint balanceOfCurrent = balanceOf(currentAddress, currentId);
       _burn(currentAddress, currentId, balanceOfCurrent);  
       S -= balanceOfCurrent;
-      nextMain.importFromProposal{gas: 1000000, value: sellPrice(balanceOfCurrent)}(currentAddress);
+      for(uint256 j = 0; j < _proposals.length ; j++){
+        nextProposal =  IProposal(_proposals[j]);
+        nextProposal.importFromMain{gas: 1000000, value: (sellPrice  (balanceOfCurrent)/_proposals.length)}(currentAddress);
+      }
       currentAddress = _nextHolders[currentAddress];
     }
     }
