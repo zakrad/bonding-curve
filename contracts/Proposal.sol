@@ -4,12 +4,11 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./IProposal.sol";
 
 
-contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
+contract Proposal is Initializable, ERC1155, Pausable, Ownable {
 
     address constant GAURD = address(1);
     uint S;
@@ -40,17 +39,19 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     }
 
     function buyPrice(uint _dS) public view returns(uint) {
-        uint dF = (A*_dS) + (B/3) * ( (S + _dS)**3 - S**3 );
+        // uint dF = (A*_dS) + (B/3) * ( (S + _dS)**3 - S**3 );
+        uint dF = 1000 * (sqrt((S+_dS)**2+10**6)-sqrt(S**2+10**6));
         return dF;
     }
 
     function sellPrice(uint _dS) public view returns(uint) {
-        uint dF = (A*_dS) + (B/3)*( S**3 - (S - _dS)**3 );
+        // uint dF = (A*_dS) + (B/3)*( S**3 - (S - _dS)**3 );
+        uint dF = 1000 * (sqrt(S**2+10**6)-sqrt((S+_dS)**2+10**6));
         return dF;
     }
 
 
-    function Buy(uint _dS) public payable returns(uint) {
+    function Buy(uint _dS) whenNotPaused() public payable returns(uint) {
         require(buyPrice(_dS) == msg.value, "Wrong value, Send the exact price");
 
         uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
@@ -66,22 +67,21 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
         return(S);
     }
 
-    function importToNext(uint _dF, address _buyer) external payable returns(uint) {
-        require(_dF == msg.value, "Wrong value, Send the exact price");
+    function importToNext(address _buyer) external payable returns(uint) {
+      // require(isProposal(msg.sender), "Only callable from another proposal");
         uint supplyId = uint(keccak256(abi.encodePacked(_buyer))); 
-        
-        // if(balanceOf(_buyer,supplyId) == 0){
-        // addHolder(_buyer, _dS);
-        // } else {
-        // increaseBalance(msg.sender, _dS);
-        // }
-        // mint(msg.sender, supplyId, _dS, "");
-
-        // S += _dS;
+        uint dS = (sqrt(((10**6)*(S**2))+((msg.value)**2)+(2000*msg.value*sqrt(S**2+10**6)))-(1000*S))/1000;
+        if(balanceOf(_buyer,supplyId) == 0){
+        addHolder(_buyer, dS);
+        } else {
+        increaseBalance(_buyer, dS);
+        }
+        mint(_buyer, supplyId, dS, "");
+        S += dS;
         return(S);
     }
 
-    function Sell(uint _dS) public returns(uint) {
+    function Sell(uint _dS) whenNotPaused() public returns(uint) {
         require(balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))) > 0, "You don't have any token to sell.");
         require(_dS <= balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))), "You don't have this amount of token");
 
@@ -98,7 +98,7 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
         return(S);
     }
 
-    function addHolder(address holder, uint256 balance) public {
+    function addHolder(address holder, uint256 balance) internal {
     require(_nextHolders[holder] == address(0));
     address index = _findIndex(balance);
     balances[holder] = balance;
@@ -107,7 +107,7 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     holders++;
     }
 
-    function removeHolder(address holder) public {
+    function removeHolder(address holder) internal {
     require(_nextHolders[holder] != address(0));
     address prevHolder = _findPrevHolder(holder);
     _nextHolders[prevHolder] = _nextHolders[holder];
@@ -119,21 +119,21 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     function increaseBalance(
     address holder, 
     uint256 balance
-  ) public {
+  ) internal {
     updateBalance(holder, balances[holder] + balance);
   }
 
   function reduceBalance(
     address holder, 
     uint256 balance
-  ) public {
+  ) internal {
     updateBalance(holder, balances[holder] - balance);
   }
 
   function updateBalance(
     address holder, 
     uint256 newBalance
-  ) public {
+  ) internal {
     require(_nextHolders[holder] != address(0));
     address prevHolder = _findPrevHolder(holder);
     address nextHolder = _nextHolders[holder];
@@ -145,12 +145,15 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     }
     }
 
-    function transferToNext(address _nextProposal) external onlyOwner {
+    function transferToNext(address _nextProposal) external onlyOwner whenPaused() {
     nextProposal =  IProposal(_nextProposal);
     address currentAddress = _nextHolders[GAURD];
     for(uint256 i = 0; i < holders; i++) {
-      uint balanceOfCurrent = balanceOf(currentAddress, uint(keccak256(abi.encodePacked(currentAddress))));
-      nextProposal.importToNext{gas: 1000000, value: sellPrice(balanceOfCurrent)}(sellPrice(balanceOfCurrent), currentAddress);
+      uint currentId = uint(keccak256(abi.encodePacked(currentAddress)));
+      uint balanceOfCurrent = balanceOf(currentAddress, currentId);
+      _burn(currentAddress, currentId, balanceOfCurrent);  
+      S -= balanceOfCurrent;
+      nextProposal.importToNext{gas: 1000000, value: sellPrice(balanceOfCurrent)}(currentAddress);
       currentAddress = _nextHolders[currentAddress];
     }
     }
@@ -223,8 +226,21 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
         internal
         whenNotPaused
-        override(ERC1155, ERC1155Supply)
+        override(ERC1155)
     {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
     }
+
+    function sqrt(uint y) internal pure returns (uint z) {
+    if (y > 3) {
+        z = y;
+        uint x = y / 2 + 1;
+        while (x < z) {
+            z = x;
+            x = (y / x + x) / 2;
+        }
+    } else if (y != 0) {
+        z = 1;
+    }
+}
 }

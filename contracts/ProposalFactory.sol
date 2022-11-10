@@ -13,6 +13,7 @@ contract ProposalFactory is Ownable {
     address immutable proposalImplementation;
     address[] public proposals;
 
+    
 
     constructor(address _dacAdmin, address _main) {
         dacAdmin = _dacAdmin;
