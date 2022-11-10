@@ -43,7 +43,7 @@ contract ProposalFactory is Ownable {
 
     constructor(address _dacAdmin, address _main) {
         dacAdmin = _dacAdmin;
-        main = _main;
+        main = address(0);
         proposalImplementation = address(new Proposal());
         mainImplementation = address(new Main());
     }
