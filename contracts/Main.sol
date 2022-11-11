@@ -51,7 +51,7 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
     }
 
 
-    function Buy(uint _dS) whenNotPaused() public payable returns(uint) {
+    function Buy(uint _dS) whenNotPaused public payable returns(uint) {
         require(buyPrice(_dS) == msg.value, "Wrong value, Send the exact price");
 
         uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
@@ -81,7 +81,7 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
         return(S);
     }
 
-    function Sell(uint _dS) whenNotPaused() public returns(uint) {
+    function Sell(uint _dS) whenNotPaused public returns(uint) {
         require(balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))) > 0, "You don't have any token to sell.");
         require(_dS <= balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))), "You don't have this amount of token");
 
@@ -145,7 +145,7 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
     }
     }
 
-    function transferToProposals(address[] memory _proposals) external onlyOwner whenPaused() {
+    function transferToProposals(address[] memory _proposals) external onlyOwner whenPaused {
     address currentAddress = _nextHolders[GAURD];
     for(uint256 i = 0; i < holders ; i++) {
       uint currentId = uint(keccak256(abi.encodePacked(currentAddress)));
@@ -154,7 +154,7 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
       S -= balanceOfCurrent;
       for(uint256 j = 0; j < _proposals.length ; j++){
         nextProposal =  IProposal(_proposals[j]);
-        nextProposal.importFromMain{gas: 1000000, value: (sellPrice  (balanceOfCurrent)/_proposals.length)}(currentAddress);
+        nextProposal.importFromMain{gas: 1000000, value: (sellPrice  (balanceOfCurrent)/_proposals.length)-1000000}(currentAddress);
       }
       currentAddress = _nextHolders[currentAddress];
     }
@@ -227,7 +227,6 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
 
     function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
         internal
-        whenNotPaused
         override(ERC1155)
     {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
@@ -244,5 +243,7 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
     } else if (y != 0) {
         z = 1;
     }
-}
+    }
+
+    receive() external payable {}
 }
