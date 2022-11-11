@@ -50,7 +50,7 @@ contract ProposalFactory is Ownable {
 
     function createMain() onlyOwner external returns(address){
         address payable clone = payable(Clones.clone(mainImplementation));
-        Main(clone).initialize("https://paper-score-api/main-nft", main, dacAdmin);
+        Main(clone).initialize(dacAdmin);
         history.push(clone);
         main = clone;
         emit MainCreated(clone);
@@ -59,7 +59,7 @@ contract ProposalFactory is Ownable {
 
     function createProposal() onlyOwner external returns(address){
         address payable clone = payable(Clones.clone(proposalImplementation));
-        Proposal(clone).initialize("https://paper-score-api/proposal-nft", main, dacAdmin);
+        Proposal(clone).initialize(dacAdmin);
         proposals.push(clone);
         emit ProposalCreated(clone);
         return clone;

@@ -11,8 +11,8 @@ import "./IProposal.sol";
 contract Main is Initializable, ERC1155, Pausable, Ownable {
 
     address constant GAURD = address(1);
-    uint S;
-    uint holders; 
+    uint public S;
+    uint public holders; 
     uint public A;
     uint public B;
     IProposal public nextProposal;
@@ -26,7 +26,7 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
         _disableInitializers();
     }
     
-    function initialize(string memory _uri, address _main, address _admin) public initializer {
+    function initialize(address _admin) public initializer {
         _transferOwnership(_admin);
         _nextHolders[GAURD] = GAURD;
         A=25;
@@ -150,12 +150,12 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
     for(uint256 i = 0; i < holders ; i++) {
       uint currentId = uint(keccak256(abi.encodePacked(currentAddress)));
       uint balanceOfCurrent = balanceOf(currentAddress, currentId);
-      _burn(currentAddress, currentId, balanceOfCurrent);  
-      S -= balanceOfCurrent;
       for(uint256 j = 0; j < _proposals.length ; j++){
         nextProposal =  IProposal(_proposals[j]);
-        nextProposal.importFromMain{gas: 1000000, value: (sellPrice  (balanceOfCurrent)/_proposals.length)-1000000}(currentAddress);
+        nextProposal.importFromMain{gas: 1000000, value: (sellPrice(balanceOfCurrent)/_proposals.length)-1000000}(currentAddress);
       }
+      _burn(currentAddress, currentId, balanceOfCurrent);  
+      S -= balanceOfCurrent;
       currentAddress = _nextHolders[currentAddress];
     }
     }
