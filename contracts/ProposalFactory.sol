@@ -17,29 +17,6 @@ contract ProposalFactory is Ownable {
     address[] public proposals;
     address[] public history;
 
-    // enum State
-    // {
-    // MAIN,     //0
-    // OPEN,     //1
-    // PROPOSAL  //2
-    // }
-
-    // State public period;
-
-    // modifier isMain() {
-    //   require(period == State.MAIN, "This function only allowed in Main state.");
-    //   _;
-    // }
-
-    // modifier isOpen() {
-    //   require(period == State.OPEN, "This function only allowed in Open state.");
-    //   _;
-    // }
-
-    // modifier isProposal() {
-    //   require(period == State.PROPOSAL, "This function only allowed in Proposal state.");
-    //   _;
-    // }
 
     constructor(address _dacAdmin) {
         dacAdmin = _dacAdmin;
