@@ -26,7 +26,6 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     function initialize(address _admin) public initializer {
         _transferOwnership(_admin);
         _nextHolders[GAURD] = GAURD;
-        pause();
     }
 
     modifier proposalExists(uint _id) {
@@ -47,7 +46,7 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     }
 
     function createProposal() public onlyOwner whenPaused{
-        _mint(address(this), nextId, 1, "");
+        _mint(msg.sender, nextId, 1, "");
         nextId++;
     }
 
@@ -123,9 +122,9 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
     for(uint8 i=0; i < sortedIds.length; i++){
       for(uint256 j= 0; j < holders[sortedIds[i]]; j++) {
         nextMain.importFromProposal{gas: 1000000, value: sellPrice(balanceOf(currentAddress, sortedIds[i]), sortedIds[i])-1000000}(currentAddress);
+      }
         _burn(currentAddress, sortedIds[i], balanceOf(currentAddress, sortedIds[i]));
         currentAddress = _nextHolders[currentAddress];
-      }
     }
     return currentAddress;
   }
@@ -203,7 +202,7 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
 
     function _afterTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
         internal
-        override(ERC1155, ERC1155Supply)
+        override(ERC1155)
     {
         super._afterTokenTransfer(operator, from, to, ids, amounts, data);
         if(from != address(0) && to != address(0)){

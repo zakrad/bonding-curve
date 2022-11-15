@@ -23,7 +23,7 @@ contract Main is Initializable, ERC20, Pausable, Ownable {
     function initialize(address _admin) public initializer {
         _transferOwnership(_admin);
         _nextHolders[GAURD] = GAURD;
-        _mint(msg.sender, 1 * 10 ** decimals());
+        _mint(_admin, 1);
     }
 
     function buyPrice(uint _dS) public view returns(uint) {
@@ -104,9 +104,9 @@ contract Main is Initializable, ERC20, Pausable, Ownable {
 
   function transferToProposals(address _proposal, uint8 numProps, uint _holders) external onlyOwner whenPaused {
     address currentAddress = _nextHolders[GAURD];
+    nextProposal =  IProposal(_proposal);
     for(uint256 i = 0; i < _holders ; i++) {
       for(uint8 j = 0; j < numProps ; j++){
-        nextProposal =  IProposal(_proposal);
         nextProposal.importFromMain{gas: 1000000, value: (sellPrice(balanceOf(currentAddress))/numProps)-1000000}(currentAddress, j);
       }
       _burn(currentAddress, balanceOf(currentAddress));
