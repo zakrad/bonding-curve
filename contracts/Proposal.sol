@@ -5,20 +5,17 @@ import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import "./IMain.sol";
 
 
-contract Proposal is Initializable, ERC1155, Pausable, Ownable {
+contract Proposal is Initializable, ERC1155, Pausable, Ownable, ERC1155Supply {
 
     address constant GAURD = address(1);
-    uint public S;
-    uint public holders; 
-    uint public A;
-    uint public B;
+    uint public nextId;
     IMain public nextMain;
 
-
-    mapping (address => uint) public balances;
+    mapping (uint => uint) public holders;
     mapping (address => address) _nextHolders;
 
 
@@ -29,150 +26,124 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable {
     function initialize(address _admin) public initializer {
         _transferOwnership(_admin);
         _nextHolders[GAURD] = GAURD;
-        A=25;
-        B=3;
+        pause();
     }
 
-    modifier onlyCaller(address _sender, uint _supplyId) {
-      require(uint(keccak256(abi.encodePacked(_sender))) == _supplyId, "Your id does not match");
+    modifier proposalExists(uint _id) {
+      require(exists(_id) , "Proposal ID does not exists");
       _;
     }
 
-    function buyPrice(uint _dS) public view returns(uint) {
+    function buyPrice(uint _dS, uint _id) public view returns(uint) {
         // uint dF = (A*_dS) + (B/3) * ( (S + _dS)**3 - S**3 );
-        uint dF = 1000 * (sqrt((S+_dS)**2+10**6)-sqrt(S**2+10**6));
+        uint dF = 1000 * (sqrt((totalSupply(_id)+_dS)**2+10**6)-sqrt(totalSupply(_id)**2+10**6));
         return dF;
     }
 
-    function sellPrice(uint _dS) public view returns(uint) {
+    function sellPrice(uint _dS, uint _id) public view returns(uint) {
         // uint dF = (A*_dS) + (B/3)*( S**3 - (S - _dS)**3 );
-        uint dF = 1000 * (sqrt(S**2+10**6)-sqrt((S-_dS)**2+10**6));
+        uint dF = 1000 * (sqrt(totalSupply(_id)**2+10**6)-sqrt((totalSupply(_id)-_dS)**2+10**6));
         return dF;
     }
 
-
-    function Buy(uint _dS) whenNotPaused public payable returns(uint) {
-        require(buyPrice(_dS) == msg.value, "Wrong value, Send the exact price");
-
-        uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
-
-        if(balanceOf(msg.sender,supplyId) == 0){
-        addHolder(msg.sender, _dS);
-        } else {
-        increaseBalance(msg.sender, _dS);
-        }
-        mint(msg.sender, supplyId, _dS, "");
-
-        S += _dS;
-        return(S);
+    function createProposal() public onlyOwner whenPaused{
+        _mint(address(this), nextId, 1, "");
+        nextId++;
     }
 
-    function importFromMain(address _buyer) external payable returns(uint) {
+    function Buy(uint _dS, uint _id) whenNotPaused proposalExists(_id) public payable returns(uint) {
+        require(buyPrice(_dS, _id) == msg.value, "Wrong value, Send the exact price");
+        _mint(msg.sender, _id, _dS, "");
+        return(totalSupply(_id));
+    }
+
+    function importFromMain(address _buyer, uint _id) proposalExists(_id) external payable returns(uint) {
       // require(isProposal(msg.sender), "Only callable from another proposal");
-        uint supplyId = uint(keccak256(abi.encodePacked(_buyer))); 
-        uint dS = (sqrt(((10**6)*(S**2))+((msg.value)**2)+(2000*msg.value*sqrt(S**2+10**6)))-(1000*S))/1000;
-        if(balanceOf(_buyer,supplyId) == 0){
-        addHolder(_buyer, dS);
-        } else {
-        increaseBalance(_buyer, dS);
-        }
-        mint(_buyer, supplyId, dS, "");
-        S += dS;
-        return(S);
+        uint dS = (sqrt(((10**6)*(totalSupply(_id)**2))+((msg.value)**2)+(2000*msg.value*sqrt(totalSupply(_id)**2+10**6)))-(1000*totalSupply(_id)))/1000;
+        _mint(_buyer, _id, dS, "");
+        return(totalSupply(_id));
     }
 
-    function Sell(uint _dS) whenNotPaused public returns(uint) {
-        require(balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))) > 0, "You don't have any token to sell.");
-        require(_dS <= balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))), "You don't have this amount of token");
-
-        uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
-
-        if(_dS == balanceOf(msg.sender,supplyId)){
-        removeHolder(msg.sender);
-        } else {
-        reduceBalance(msg.sender, _dS);
-        }
-        _burn(msg.sender, supplyId, _dS);
-        payable(msg.sender).transfer(sellPrice(_dS));      
-        S -= _dS;
-        return(S);
+    function Sell(uint _dS, uint _id) whenNotPaused proposalExists(_id) public returns(uint) {
+        require(balanceOf(msg.sender, _id) > 0, "You don't have any token in this proposal.");
+        require(_dS <= balanceOf(msg.sender, _id), "You don't have this amount of token");
+        _burn(msg.sender, _id, _dS);
+        payable(msg.sender).transfer(sellPrice(_dS, _id));
+        return(totalSupply(_id));
     }
 
-    function addHolder(address holder, uint256 balance) internal {
+    function addHolder(address holder, uint _id, uint amount) internal {
     require(_nextHolders[holder] == address(0));
-    address index = _findIndex(balance);
-    balances[holder] = balance;
+    address index = _findIndex(amount, _id);
     _nextHolders[holder] = _nextHolders[index];
     _nextHolders[index] = holder;
-    holders++;
+    holders[_id]++;
     }
 
-    function removeHolder(address holder) internal {
+    function removeHolder(address holder, uint _id) internal {
     require(_nextHolders[holder] != address(0));
     address prevHolder = _findPrevHolder(holder);
     _nextHolders[prevHolder] = _nextHolders[holder];
     _nextHolders[holder] = address(0);
-    balances[holder] = 0;
-    holders--;
+    holders[_id]--;
     }
 
-    function increaseBalance(
+  function increaseBalance(
     address holder, 
-    uint256 balance
+    uint _id,
+    uint amount
   ) internal {
-    updateBalance(holder, balances[holder] + balance);
+    updateBalance(holder, balanceOf(holder, _id) + amount, _id);
   }
 
   function reduceBalance(
     address holder, 
-    uint256 balance
+    uint _id
   ) internal {
-    updateBalance(holder, balances[holder] - balance);
+    updateBalance(holder, balanceOf(holder, _id), _id);
   }
 
   function updateBalance(
     address holder, 
-    uint256 newBalance
+    uint newBalance,
+    uint _id
   ) internal {
     require(_nextHolders[holder] != address(0));
     address prevHolder = _findPrevHolder(holder);
     address nextHolder = _nextHolders[holder];
-    if(_verifyIndex(prevHolder, newBalance, nextHolder)){
-      balances[holder] = newBalance;
-    } else {
-      removeHolder(holder);
-      addHolder(holder, newBalance);
+    if(!_verifyIndex(prevHolder, newBalance, nextHolder, _id)){
+      removeHolder(holder, _id);
+      addHolder(holder, _id, newBalance);
     }
-    }
+  }
 
-    function transferToMain(address _main) external onlyOwner whenPaused returns(address){
+  function transferToMain(address _main, uint8[] memory sortedIds) external onlyOwner whenPaused returns(address){
     nextMain =  IMain(_main);
     address currentAddress = _nextHolders[GAURD];
-    for(uint256 i = 0; i < holders; i++) {
-      uint currentId = uint(keccak256(abi.encodePacked(currentAddress)));
-      uint balanceOfCurrent = balanceOf(currentAddress, currentId);
-      nextMain.importFromProposal{gas: 1000000, value: sellPrice(balanceOfCurrent)-1000000}(currentAddress);
-      _burn(currentAddress, currentId, balanceOfCurrent);  
-      S -= balanceOfCurrent;
-      currentAddress = _nextHolders[currentAddress];
+    for(uint8 i=0; i < sortedIds.length; i++){
+      for(uint256 j= 0; j < holders[sortedIds[i]]; j++) {
+        nextMain.importFromProposal{gas: 1000000, value: sellPrice(balanceOf(currentAddress, sortedIds[i]), sortedIds[i])-1000000}(currentAddress);
+        _burn(currentAddress, sortedIds[i], balanceOf(currentAddress, sortedIds[i]));
+        currentAddress = _nextHolders[currentAddress];
+      }
     }
     return currentAddress;
-    }
+  }
 
-   function getArray() public view returns(address[] memory) {
-    address[] memory holderList = new address[](holders);
+   function getArray(uint8 _id) public view returns(address[] memory) {
+    address[] memory holderList = new address[](holders[_id]);
     address currentAddress = _nextHolders[GAURD];
-    for(uint256 i = 0; i < holders; i++) {
+    for(uint256 i = 0; i < holders[_id]; i++) {
       holderList[i] = currentAddress;
       currentAddress = _nextHolders[currentAddress];
     }
     return holderList;
     }
 
-    function _findIndex(uint256 newValue) internal view returns(address) {
+    function _findIndex(uint256 newValue, uint _id) internal view returns(address) {
     address candidateAddress = GAURD;
     while(true) {
-      if(_verifyIndex(candidateAddress, newValue, _nextHolders[candidateAddress]))
+      if(_verifyIndex(candidateAddress, newValue, _nextHolders[candidateAddress], _id))
         return candidateAddress;
       candidateAddress = _nextHolders[candidateAddress];
     }
@@ -180,12 +151,12 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable {
   }
 
 
-    function _verifyIndex(address prevHolder, uint256 newValue, address nextHolder)
+    function _verifyIndex(address prevHolder, uint256 newValue, address nextHolder, uint _id)
     internal
     view
     returns(bool) {
-    return (prevHolder == GAURD || balances[prevHolder] >= newValue) && 
-           (nextHolder == GAURD || newValue > balances[nextHolder]);
+    return (prevHolder == GAURD || balanceOf(prevHolder, _id) >= newValue) && 
+           (nextHolder == GAURD || newValue > balanceOf(nextHolder, _id));
     }
     
     function _isPrevHolder(address holder, address prevHolder) internal view returns(bool) {
@@ -210,25 +181,44 @@ contract Proposal is Initializable, ERC1155, Pausable, Ownable {
         _unpause();
     }
 
-    function mint(address account, uint256 id, uint256 amount, bytes memory data)
-        internal
-        onlyCaller(account, id)
-    {
-        _mint(account, id, amount, data);
-    }
-
-    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
-        public
-        onlyOwner
-    {
-        _mintBatch(to, ids, amounts, data);
-    }
-
     function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
         internal
-        override(ERC1155)
+        override(ERC1155, ERC1155Supply)
     {
         super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
+        if(from != address(0) && to != address(0)){
+          if(balanceOf(to, ids[0]) == 0){
+                addHolder(to, ids[0], amounts[0]);     
+          } else {
+                increaseBalance(to, ids[0], amounts[0]);
+          }
+        } else if(from == address(0)){
+            if(balanceOf(to, ids[0]) == 0){
+              addHolder(to, ids[0], amounts[0]);
+            } else {
+              increaseBalance(to, ids[0], amounts[0]);
+            }
+        }
+    }
+
+    function _afterTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+        internal
+        override(ERC1155, ERC1155Supply)
+    {
+        super._afterTokenTransfer(operator, from, to, ids, amounts, data);
+        if(from != address(0) && to != address(0)){
+            if(balanceOf(from, ids[0]) == 0){
+              removeHolder(from, ids[0]);
+            } else {
+              reduceBalance(from, ids[0]);
+            }
+        } else if(to == address(0)){
+           if(balanceOf(from, ids[0]) == 0){
+              removeHolder(from, ids[0]);
+            } else {
+              reduceBalance(from, ids[0]);
+            } 
+        }
     }
 
     function sqrt(uint y) internal pure returns (uint z) {

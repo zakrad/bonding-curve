@@ -1,107 +1,68 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./IProposal.sol";
 
 
-contract Main is Initializable, ERC1155, Pausable, Ownable {
+contract Main is Initializable, ERC20, Pausable, Ownable {
 
     address constant GAURD = address(1);
-    uint public S;
-    uint public holders; 
-    uint public A;
-    uint public B;
     IProposal public nextProposal;
+    uint public holders; 
 
-
-    mapping (address => uint) public balances;
     mapping (address => address) _nextHolders;
 
-
-    constructor() ERC1155("") {
+    constructor() ERC20("DeCorp", "DAC") {
         _disableInitializers();
     }
     
     function initialize(address _admin) public initializer {
         _transferOwnership(_admin);
         _nextHolders[GAURD] = GAURD;
-        A=25;
-        B=3;
-    }
-
-    modifier onlyCaller(address _sender, uint _supplyId) {
-      require(uint(keccak256(abi.encodePacked(_sender))) == _supplyId, "Your id does not match");
-      _;
+        _mint(msg.sender, 1 * 10 ** decimals());
     }
 
     function buyPrice(uint _dS) public view returns(uint) {
         // uint dF = (A*_dS) + (B/3) * ( (S + _dS)**3 - S**3 );
-        uint dF = 1000 * (sqrt((S+_dS)**2+10**6)-sqrt(S**2+10**6));
+        uint dF = 1000 * (sqrt((totalSupply()+_dS)**2+10**6)-sqrt(totalSupply()**2+10**6));
         return dF;
     }
 
     function sellPrice(uint _dS) public view returns(uint) {
         // uint dF = (A*_dS) + (B/3)*( S**3 - (S - _dS)**3 );
-        uint dF = 1000 * (sqrt(S**2+10**6)-sqrt((S-_dS)**2+10**6));
+        uint dF = 1000 * (sqrt(totalSupply()**2+10**6)-sqrt((totalSupply()-_dS)**2+10**6));
         return dF;
     }
 
 
     function Buy(uint _dS) whenNotPaused public payable returns(uint) {
         require(buyPrice(_dS) == msg.value, "Wrong value, Send the exact price");
-
-        uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
-
-        if(balanceOf(msg.sender,supplyId) == 0){
-        addHolder(msg.sender, _dS);
-        } else {
-        increaseBalance(msg.sender, _dS);
-        }
-        mint(msg.sender, supplyId, _dS, "");
-
-        S += _dS;
-        return(S);
+        _mint(msg.sender, _dS);
+        return(totalSupply());
     }
 
     function importFromProposal(address _buyer) external payable returns(uint) {
       // require(isProposal(msg.sender), "Only callable from another proposal");
-        uint supplyId = uint(keccak256(abi.encodePacked(_buyer))); 
-        uint dS = (sqrt(((10**6)*(S**2))+((msg.value)**2)+(2000*msg.value*sqrt(S**2+10**6)))-(1000*S))/1000;
-        if(balanceOf(_buyer,supplyId) == 0){
-        addHolder(_buyer, dS);
-        } else {
-        increaseBalance(_buyer, dS);
-        }
-        mint(_buyer, supplyId, dS, "");
-        S += dS;
-        return(S);
+        uint dS = (sqrt(((10**6)*(totalSupply()**2))+((msg.value)**2)+(2000*msg.value*sqrt(totalSupply()**2+10**6)))-(1000*totalSupply()))/1000;
+        _mint(_buyer, dS);
+        return(totalSupply());
     }
 
     function Sell(uint _dS) whenNotPaused public returns(uint) {
-        require(balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))) > 0, "You don't have any token to sell.");
-        require(_dS <= balanceOf(msg.sender,uint(keccak256(abi.encodePacked(msg.sender)))), "You don't have this amount of token");
-
-        uint supplyId = uint(keccak256(abi.encodePacked(msg.sender))); 
-
-        if(_dS == balanceOf(msg.sender,supplyId)){
-        removeHolder(msg.sender);
-        } else {
-        reduceBalance(msg.sender, _dS);
-        }
-        _burn(msg.sender, supplyId, _dS);
-        payable(msg.sender).transfer(sellPrice(_dS));      
-        S -= _dS;
-        return(S);
+        require(balanceOf(msg.sender) > 0, "You don't have any token to sell.");
+        require(_dS <= balanceOf(msg.sender), "You don't have this amount of token");
+        _burn(msg.sender, _dS);
+        payable(msg.sender).transfer(sellPrice(_dS));
+        return(totalSupply());
     }
 
-    function addHolder(address holder, uint256 balance) internal {
+    function addHolder(address holder, uint amount) internal {
     require(_nextHolders[holder] == address(0));
-    address index = _findIndex(balance);
-    balances[holder] = balance;
+    address index = _findIndex(amount);
     _nextHolders[holder] = _nextHolders[index];
     _nextHolders[index] = holder;
     holders++;
@@ -112,22 +73,20 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
     address prevHolder = _findPrevHolder(holder);
     _nextHolders[prevHolder] = _nextHolders[holder];
     _nextHolders[holder] = address(0);
-    balances[holder] = 0;
     holders--;
     }
 
-    function increaseBalance(
+  function increaseBalance(
     address holder, 
-    uint256 balance
+    uint amount
   ) internal {
-    updateBalance(holder, balances[holder] + balance);
+    updateBalance(holder, balanceOf(holder) + amount);
   }
 
   function reduceBalance(
-    address holder, 
-    uint256 balance
+    address holder
   ) internal {
-    updateBalance(holder, balances[holder] - balance);
+    updateBalance(holder, balanceOf(holder));
   }
 
   function updateBalance(
@@ -137,30 +96,25 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
     require(_nextHolders[holder] != address(0));
     address prevHolder = _findPrevHolder(holder);
     address nextHolder = _nextHolders[holder];
-    if(_verifyIndex(prevHolder, newBalance, nextHolder)){
-      balances[holder] = newBalance;
-    } else {
+    if(!_verifyIndex(prevHolder, newBalance, nextHolder)){
       removeHolder(holder);
       addHolder(holder, newBalance);
     }
-    }
+  }
 
-    function transferToProposals(address[] memory _proposals) external onlyOwner whenPaused {
+  function transferToProposals(address _proposal, uint8 numProps, uint _holders) external onlyOwner whenPaused {
     address currentAddress = _nextHolders[GAURD];
-    for(uint256 i = 0; i < holders ; i++) {
-      uint currentId = uint(keccak256(abi.encodePacked(currentAddress)));
-      uint balanceOfCurrent = balanceOf(currentAddress, currentId);
-      for(uint256 j = 0; j < _proposals.length ; j++){
-        nextProposal =  IProposal(_proposals[j]);
-        nextProposal.importFromMain{gas: 1000000, value: (sellPrice(balanceOfCurrent)/_proposals.length)-1000000}(currentAddress);
+    for(uint256 i = 0; i < _holders ; i++) {
+      for(uint8 j = 0; j < numProps ; j++){
+        nextProposal =  IProposal(_proposal);
+        nextProposal.importFromMain{gas: 1000000, value: (sellPrice(balanceOf(currentAddress))/numProps)-1000000}(currentAddress, j);
       }
-      _burn(currentAddress, currentId, balanceOfCurrent);  
-      S -= balanceOfCurrent;
+      _burn(currentAddress, balanceOf(currentAddress));
       currentAddress = _nextHolders[currentAddress];
     }
-    }
+  }
 
-   function getArray() public view returns(address[] memory) {
+  function getArray() public view returns(address[] memory) {
     address[] memory holderList = new address[](holders);
     address currentAddress = _nextHolders[GAURD];
     for(uint256 i = 0; i < holders; i++) {
@@ -168,9 +122,9 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
       currentAddress = _nextHolders[currentAddress];
     }
     return holderList;
-    }
+  }
 
-    function _findIndex(uint256 newValue) internal view returns(address) {
+  function _findIndex(uint256 newValue) internal view returns(address) {
     address candidateAddress = GAURD;
     while(true) {
       if(_verifyIndex(candidateAddress, newValue, _nextHolders[candidateAddress]))
@@ -181,19 +135,19 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
   }
 
 
-    function _verifyIndex(address prevHolder, uint256 newValue, address nextHolder)
+  function _verifyIndex(address prevHolder, uint256 newValue, address nextHolder)
     internal
     view
     returns(bool) {
-    return (prevHolder == GAURD || balances[prevHolder] >= newValue) && 
-           (nextHolder == GAURD || newValue > balances[nextHolder]);
-    }
+    return (prevHolder == GAURD || balanceOf(prevHolder) >= newValue) && 
+           (nextHolder == GAURD || newValue > balanceOf(nextHolder));
+  }
     
-    function _isPrevHolder(address holder, address prevHolder) internal view returns(bool) {
+  function _isPrevHolder(address holder, address prevHolder) internal view returns(bool) {
     return _nextHolders[prevHolder] == holder;
-    }
+  }
 
-    function _findPrevHolder(address holder) internal view returns(address) {
+  function _findPrevHolder(address holder) internal view returns(address) {
     address currentAddress = GAURD;
     while(_nextHolders[currentAddress] != GAURD) {
       if(_isPrevHolder(holder, currentAddress))
@@ -203,36 +157,56 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
     return address(0);
   }
 
-    function pause() public onlyOwner {
+  function pause() public onlyOwner {
         _pause();
-    }
+  }
 
-    function unpause() public onlyOwner {
+  function unpause() public onlyOwner {
         _unpause();
-    }
+  }
 
-    function mint(address account, uint256 id, uint256 amount, bytes memory data)
+  function _beforeTokenTransfer(address from, address to, uint256 amount)
         internal
-        onlyCaller(account, id)
-    {
-        _mint(account, id, amount, data);
-    }
+        override
+  {
+        super._beforeTokenTransfer(from, to, amount);
+        if(from != address(0) && to != address(0)){
+          if(balanceOf(to) == 0){
+                addHolder(to, amount);     
+          } else {
+                increaseBalance(to, amount);
+          }
+        } else if(from == address(0) && to != address(0)){
+            if(balanceOf(to) == 0){
+              addHolder(to, amount);
+            } else {
+              increaseBalance(to, amount);
+            }
+        }
+  }
 
-    function mintBatch(address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
-        public
-        onlyOwner
-    {
-        _mintBatch(to, ids, amounts, data);
-    }
-
-    function _beforeTokenTransfer(address operator, address from, address to, uint256[] memory ids, uint256[] memory amounts, bytes memory data)
+  function _afterTokenTransfer(address from, address to, uint256 amount)
         internal
-        override(ERC1155)
-    {
-        super._beforeTokenTransfer(operator, from, to, ids, amounts, data);
-    }
+        override
+  {
+        super._afterTokenTransfer(from, to, amount);
+        if(from != address(0) && to != address(0)){
+            if(balanceOf(from) == 0){
+              removeHolder(from);
+            } else {
+              reduceBalance(from);
+            }
+        } else if(from != address(0) && to == address(0)){
+           if(balanceOf(from) == 0){
+              removeHolder(from);
+            } else {
+              reduceBalance(from);
+            } 
+        }
+  }
+    
 
-    function sqrt(uint y) internal pure returns (uint z) {
+  function sqrt(uint y) internal pure returns (uint z) {
     if (y > 3) {
         z = y;
         uint x = y / 2 + 1;
@@ -243,7 +217,6 @@ contract Main is Initializable, ERC1155, Pausable, Ownable {
     } else if (y != 0) {
         z = 1;
     }
-    }
-
-    receive() external payable {}
+  }
+  receive() external payable {}
 }

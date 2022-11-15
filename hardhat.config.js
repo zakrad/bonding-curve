@@ -8,11 +8,11 @@ const mnemonic = fs.readFileSync(".secret").toString().trim();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.4",
+  solidity: "0.8.7",
   settings: { optimizer: { enabled: true, runs: 200 } },
   networks: {
     matic: {
-      url: "https://rpc-mumbai.maticvigil.com",
+      url: "https://matic-mumbai.chainstacklabs.com",
       accounts: {
         mnemonic: mnemonic,
         path: "m/44'/60'/0'/0",
